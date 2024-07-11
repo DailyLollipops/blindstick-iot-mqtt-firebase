@@ -1,0 +1,9 @@
+# Python objects
+__pycache__
+
+# Environments
+.venv
+.env
+
+# Credentials
+credentials.json
