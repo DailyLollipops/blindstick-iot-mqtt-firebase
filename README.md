@@ -9,6 +9,25 @@ A publisher based implementation of MQTT to update firestore database collection
 3. Download a service account from that project and rename it as `credentials.json`
 4. Install requirements with `pip install -r requirements.txt`
 
+### Setting up mosquito on AWS
+1. Start an EC2 ubuntu instance
+2. Open and assign the following ports in security group:
+   - 1883
+   - 8883
+   - 8080
+   - 8081
+3. Assign an elastic IP to the instance
+4. Edit mosquitto configuration
+   ```bash
+   sudo nano /etc/mosquitto/mosquitto.conf
+
+   Add the lines:
+   listener 1883 0.0.0.0
+   allow_anonymous true
+   ```
+5. Restart mosquitto with `sudo systemctl restart mosquitto`
+6. Test with `${ELASTIC_IP}:1883`
+
 ### Running
 
 To run the server, make sure the MQTT broker is up and running, then run:
