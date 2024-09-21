@@ -1,11 +1,23 @@
 from firebase_admin import credentials, firestore
 from firebase_admin import db as firebase
-from datetime import datetime, timezone
+from datetime import datetime
+from loguru import logger
 import firebase_admin
 import paho.mqtt.client as mqtt
 import paho.mqtt.publish as publish
 import click
 import traceback
+import pytz
+import sys
+
+
+log_base_format = '<green>{time}</green> | <level>{level}</level> | <cyan>{name}</cyan>:<cyan>{line}</cyan> | <level>{message}</level> {extra}\n'
+logger.add(
+    f'app.log', 
+    level="INFO", 
+    format=log_base_format
+)
+
 
 @click.command()
 @click.option("-h", "--host", default="localhost", help="MQTT broker address")
@@ -21,77 +33,96 @@ def run(**args):
     silent = args.pop("silent")
 
     cred = credentials.Certificate('credentials.json') 
-    firebase_admin.initialize_app(cred, {
-        "databaseURL": "https://blindstick-e0f8d-default-rtdb.asia-southeast1.firebasedatabase.app/"
-    })
-    parameter_reference = firebase.reference("device/parameters")
-    setting_reference = firebase.reference("device/settings")
-    firestore_db = firestore.client()
-    trigger_collection = firestore_db.collection("triggers")
+    firebase_admin.initialize_app(cred)
+    db = firestore.client()
+    parameter_reference = db.collection("parameters")
+    current_parameter_document = parameter_reference.document("current")
+    total_parameter_document = parameter_reference.document("total")
+    setting_reference = db.collection("settings").document("current")
 
-    def on_settings_change(event: firebase.Event):
-        print(f"Setting listener triggered")
-        settings = setting_reference.get()
-        print(f"Got settings: {settings}")
-        beep = settings.get("beep")
-        fall_intensity_threshold = settings.get("fall_intensity_threshold")
-        sound = settings.get("sound")
-        msg = f"{int(beep)} {fall_intensity_threshold} {int(sound)}"
-        publish.single("blindstick", msg, hostname=host)
+    current_parameters = current_parameter_document.get()
+    if not current_parameters.exists:
+        logger.error("Error in firestore schema: No document named current")
+        raise Exception("Error in firestore schema: No document named current")
+
+    total_parameters = total_parameter_document.get()
+    if not total_parameters.exists:
+        logger.error("Error in firestore schema: No document named total")
+        raise Exception("Error in firestore schema: No document named total")
+
+    def on_settings_change(doc_snapshot, changes, read_time):
+        logger.info(f"Setting listener triggered")
+        settings = doc_snapshot[-1].to_dict()
+        logger.info(f"Current settings: {settings}")
 
     def on_connect(client, userdata, flags, reason_code, properties):
-        print(f"Connected with result code: {reason_code}")
+        logger.info(f"Connected with result code: {reason_code}")
         client.subscribe(topic)
 
     def on_message(client, userdata, msg):
-        # Payload format message: '{emergency} {fall} {obstacle} {water} {lat} {lon}'
         payload = bytes.decode(msg.payload)
-        print(f"Received parameters: {payload}")
+        now = datetime.now(tz=pytz.timezone("Asia/Manila"))
+        logger.info(f"Received parameters: {payload}")
+
+        current_parameters = current_parameter_document.get().to_dict()
+        current_parameters.pop("updated_at", "")
+        total_parameters = total_parameter_document.get().to_dict()
 
         try:
             data = payload.split()
-            emergency = bool(float(data[0]))
-            fall = bool(float(data[1]))
-            obstacle = bool(float(data[2]))
-            water = bool(float(data[3]))
-            latitude = data[4]
-            longitude = data[5]
+            obstacle1= bool(float(data[0]))
+            obstacle2= bool(float(data[1]))
+            obstacle3= bool(float(data[2]))
+            obstacle4= bool(float(data[3]))
+            water = bool(float(data[4]))
+            fall = bool(float(data[5]))
+            emergency = bool(float(data[6]))
+            power = bool(float(data[7]))
+            stop = bool(float(data[8]))
             parameters = {
-                "emergency": emergency,
-                "fall": fall,
-                "obstacle": obstacle,
+                "obstacle1": obstacle1,
+                "obstacle2": obstacle2,
+                "obstacle3": obstacle3,
+                "obstacle4": obstacle4,
                 "water": water,
-                "latitude": latitude,
-                "longitude": longitude
+                "fall": fall,
+                "emergency": emergency,
+                "power": power,
+                "stop": stop
             }
-            parameter_reference.update(parameters)
-            if emergency:
-                trigger_collection.add({
-                    "source": "emergency",
-                    "created_at": datetime.now(tz=timezone.utc)
-                })
-            elif fall:
-                trigger_collection.add({
-                    "source": "fall",
-                    "created_at": datetime.now(tz=timezone.utc)
-                })
-            elif obstacle:
-                trigger_collection.add({
-                    "source": "obstacle",
-                    "created_at": datetime.now(tz=timezone.utc)
-                })
-            elif water:
-                trigger_collection.add({
-                    "source": "water",
-                    "created_at": datetime.now(tz=timezone.utc)
-                })
-            print(f"Successfully updated data")
-        except:
-            print("Error occured")
-            if not silent:
-                print(traceback.format_exc())
 
-    setting_listener = setting_reference.listen(on_settings_change)
+            if current_parameters != parameters:
+                logger.info("Current parameters changed")
+                parameters["updated_at"] = now
+                current_parameter_document.update(parameters)
+                logger.info(f"New paraemters: {parameters}")
+            else:
+                logger.info("Current parameters did not changed")
+                return
+
+            temp_total = total_parameters.copy()
+            if any([obstacle1, obstacle2, obstacle3, obstacle4]):
+                temp_total["obstacle"] += 1
+            elif water:
+                temp_total["water"] += 1
+            elif fall:
+                temp_total["fall"] += 1
+            elif emergency:
+                temp_total["emergency"] += 1
+            
+            if total_parameters != temp_total:
+                logger.info("Total parameters count changed")
+                temp_total["updated_at"] = now
+                total_parameter_document.update(temp_total)
+                logger.info(f"Total parameters: {temp_total}")
+            else:
+                logger.info("Total parameters count did not changed")
+        except Exception as e:
+            logger.warning(f"Error occurred: {e}")
+            if not silent:
+                logger.error(traceback.format_exc())
+
+    setting_listener = setting_reference.on_snapshot(on_settings_change)
     mqttc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     mqttc.on_connect = on_connect
     mqttc.on_message = on_message

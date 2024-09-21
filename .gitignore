@@ -7,3 +7,6 @@ __pycache__
 
 # Credentials
 credentials.json
+
+# Log files
+.log

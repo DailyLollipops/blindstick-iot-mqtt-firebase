@@ -36,7 +36,7 @@ A publisher based implementation of MQTT to update firestore database collection
 To run the server, make sure the MQTT broker is up and running, then run:
 
 ```bash
-python server.py -t server
+python server.py -t data
 ```
 
 where the `-t` argument is the topic subscribed on by the blindstick devices
@@ -46,7 +46,7 @@ where the `-t` argument is the topic subscribed on by the blindstick devices
 You can run the publish script by emulating the data sent by the blindstick devices using
 
 ```bash
-python publish.py -h localhost -t server -p "1 0 1 1 121.34221 77.4343"
+python publish.py -h localhost -t data -p "1 0 1 1 1 0 1 1 1"
 ```
 
 where:
