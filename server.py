@@ -1,5 +1,4 @@
-from firebase_admin import credentials, firestore
-from firebase_admin import db as firebase
+from firebase_admin import credentials, firestore, messaging
 from datetime import datetime
 from loguru import logger
 import firebase_admin
@@ -11,7 +10,7 @@ import pytz
 import sys
 
 
-log_base_format = '<green>{time}</green> | <level>{level}</level> | <cyan>{name}</cyan>:<cyan>{line}</cyan> | <level>{message}</level> {extra}\n'
+log_base_format = '<green>{time}</green> | <level>{level}</level> | <cyan>{name}</cyan>:<cyan>{line}</cyan> | <level>{message}</level> {extra}'
 logger.add(
     f'app.log', 
     level="INFO", 
@@ -39,6 +38,7 @@ def run(**args):
     current_parameter_document = parameter_reference.document("current")
     total_parameter_document = parameter_reference.document("total")
     setting_reference = db.collection("settings").document("current")
+    notification_reference = db.collection("notifications")
 
     current_parameters = current_parameter_document.get()
     if not current_parameters.exists:
@@ -58,6 +58,26 @@ def run(**args):
     def on_connect(client, userdata, flags, reason_code, properties):
         logger.info(f"Connected with result code: {reason_code}")
         client.subscribe(topic)
+
+    def send_notifications(title, body):
+        message = messaging.Message(
+            notification=messaging.Notification(
+                title=title,
+                body=body
+            ),
+            topic="notifications"
+        )
+        response = messaging.send(message)
+        logger.info(f"Successfully sent notification: {response}")
+
+    def save_nofications(_type, title, body, timestamp):
+        data = notification_reference.add({
+            "type": _type,
+            "title": title,
+            "body": body,
+            "created_at": timestamp,
+        })
+        logger.info(f"Successfully saved notification: {data}")
 
     def on_message(client, userdata, msg):
         payload = bytes.decode(msg.payload)
@@ -95,28 +115,43 @@ def run(**args):
                 logger.info("Current parameters changed")
                 parameters["updated_at"] = now
                 current_parameter_document.update(parameters)
-                logger.info(f"New paraemters: {parameters}")
+                logger.info(f"New parameters: {parameters}")
+                parameters.pop("updated_at")
             else:
                 logger.info("Current parameters did not changed")
                 return
 
             temp_total = total_parameters.copy()
-            if any([obstacle1, obstacle2, obstacle3, obstacle4]):
+            diff_keys = [k for k in current_parameters if current_parameters[k] != parameters[k]]
+            obstacles = ["obstacle1", "obstacle2", "obstacle3", "obstacle4"]
+            if any(obstacle in diff_keys for obstacle in obstacles) and any([parameters[key] for key in diff_keys]):
                 temp_total["obstacle"] += 1
-            elif water:
+                title="Obstacle detected"
+                body="An obstacle was detected nearby the blindstick user"
+                send_notifications(title, body)
+                save_nofications("hazard", title, body, now)
+            elif water in diff_keys and water:
                 temp_total["water"] += 1
-            elif fall:
+                title="Water detected"
+                body="Water was detected nearby the blindstick user"
+                send_notifications(title, body)
+                save_nofications("hazard", title, body, now)
+            elif fall in diff_keys and fall:
                 temp_total["fall"] += 1
-            elif emergency:
+                title="Fall detected"
+                body="Blindstick user has fallen"
+                send_notifications(title, body)
+                save_nofications("hazard", title, body, now)
+            elif emergency in diff_keys and emergency:
                 temp_total["emergency"] += 1
-            
-            if total_parameters != temp_total:
-                logger.info("Total parameters count changed")
-                temp_total["updated_at"] = now
-                total_parameter_document.update(temp_total)
-                logger.info(f"Total parameters: {temp_total}")
-            else:
-                logger.info("Total parameters count did not changed")
+                title="Emergency detected"
+                body="Blindstick user has called for an emergeny"
+                send_notifications(title, body)
+                save_nofications("hazard", title, body, now)
+            temp_total["updated_at"] = now
+            total_parameter_document.update(temp_total)
+            logger.info(f"Total parameters: {temp_total}")
+
         except Exception as e:
             logger.warning(f"Error occurred: {e}")
             if not silent:
