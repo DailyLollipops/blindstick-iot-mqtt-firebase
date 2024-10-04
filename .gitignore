@@ -9,4 +9,4 @@ __pycache__
 credentials.json
 
 # Log files
-.log
+*.log
