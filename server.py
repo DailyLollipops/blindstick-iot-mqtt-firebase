@@ -93,7 +93,6 @@ def run(**args):
             obstacle1= bool(float(data[0]))
             obstacle2= bool(float(data[1]))
             obstacle3= bool(float(data[2]))
-            obstacle4= bool(float(data[3]))
             water = bool(float(data[4]))
             fall = bool(float(data[5]))
             emergency = bool(float(data[6]))
@@ -103,7 +102,6 @@ def run(**args):
                 "obstacle1": obstacle1,
                 "obstacle2": obstacle2,
                 "obstacle3": obstacle3,
-                "obstacle4": obstacle4,
                 "water": water,
                 "fall": fall,
                 "emergency": emergency,
@@ -124,7 +122,7 @@ def run(**args):
             temp_total = total_parameters.copy()
             diff_keys = [k for k in current_parameters if current_parameters[k] != parameters[k]]
             logger.info(f"Diff: {diff_keys}")
-            obstacles = ["obstacle1", "obstacle2", "obstacle3", "obstacle4"]
+            obstacles = ["obstacle1", "obstacle2", "obstacle3"]
             if any(obstacle in diff_keys for obstacle in obstacles) and any([parameters[key] for key in diff_keys]):
                 temp_total["obstacle"] += 1
                 title="Obstacle detected"
