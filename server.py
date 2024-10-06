@@ -123,6 +123,7 @@ def run(**args):
 
             temp_total = total_parameters.copy()
             diff_keys = [k for k in current_parameters if current_parameters[k] != parameters[k]]
+            logger.info(f"Diff: {diff_keys}")
             obstacles = ["obstacle1", "obstacle2", "obstacle3", "obstacle4"]
             if any(obstacle in diff_keys for obstacle in obstacles) and any([parameters[key] for key in diff_keys]):
                 temp_total["obstacle"] += 1
@@ -130,19 +131,19 @@ def run(**args):
                 body="An obstacle was detected nearby the blindstick user"
                 send_notifications(title, body)
                 save_nofications("hazard", title, body, now)
-            elif water in diff_keys and water:
+            elif "water" in diff_keys and water:
                 temp_total["water"] += 1
                 title="Water detected"
                 body="Water was detected nearby the blindstick user"
                 send_notifications(title, body)
                 save_nofications("hazard", title, body, now)
-            elif fall in diff_keys and fall:
+            elif "fall" in diff_keys and fall:
                 temp_total["fall"] += 1
                 title="Fall detected"
                 body="Blindstick user has fallen"
                 send_notifications(title, body)
                 save_nofications("hazard", title, body, now)
-            elif emergency in diff_keys and emergency:
+            elif "emergency" in diff_keys and emergency:
                 temp_total["emergency"] += 1
                 title="Emergency detected"
                 body="Blindstick user has called for an emergeny"
