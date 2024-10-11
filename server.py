@@ -93,11 +93,11 @@ def run(**args):
             obstacle1= bool(float(data[0]))
             obstacle2= bool(float(data[1]))
             obstacle3= bool(float(data[2]))
-            water = bool(float(data[4]))
-            fall = bool(float(data[5]))
-            emergency = bool(float(data[6]))
-            power = bool(float(data[7]))
-            stop = bool(float(data[8]))
+            water = bool(float(data[3]))
+            fall = bool(float(data[4]))
+            emergency = bool(float(data[5]))
+            power = bool(float(data[6]))
+            stop = bool(float(data[7]))
             parameters = {
                 "obstacle1": obstacle1,
                 "obstacle2": obstacle2,
