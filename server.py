@@ -54,6 +54,9 @@ def run(**args):
         logger.info(f"Setting listener triggered")
         settings = doc_snapshot[-1].to_dict()
         logger.info(f"Current settings: {settings}")
+        payload = f"{settings.get('buzzer_volume')} {settings.get('vibration_intensity')}"
+        publish.single("settings", payload, hostname=host)
+        logger.info(f"Sent settings data: {payload}")
 
     def on_connect(client, userdata, flags, reason_code, properties):
         logger.info(f"Connected with result code: {reason_code}")
