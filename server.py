@@ -38,6 +38,7 @@ def run(**args):
     current_parameter_document = parameter_reference.document("current")
     total_parameter_document = parameter_reference.document("total")
     setting_reference = db.collection("settings").document("current")
+    event_reference = db.collection("events")
     notification_reference = db.collection("notifications")
 
     current_parameters = current_parameter_document.get()
@@ -72,6 +73,13 @@ def run(**args):
         )
         response = messaging.send(message)
         logger.info(f"Successfully sent notification: {response}")
+
+    def save_event(_type, timestamp):
+        data = event_reference.add({
+            "type": _type,
+            "created_at": timestamp,
+        })
+        logger.info(f"Successfully saved event: {data}")
 
     def save_nofications(_type, title, body, timestamp):
         data = notification_reference.add({
@@ -131,24 +139,28 @@ def run(**args):
                 title="Obstacle detected"
                 body="An obstacle was detected nearby the blindstick user"
                 send_notifications(title, body)
+                save_event("obstacle_detected", now)
                 save_nofications("hazard", title, body, now)
             elif "water" in diff_keys and water:
                 temp_total["water"] += 1
                 title="Water detected"
                 body="Water was detected nearby the blindstick user"
                 send_notifications(title, body)
+                save_event("water_detected", now)
                 save_nofications("hazard", title, body, now)
             elif "fall" in diff_keys and fall:
                 temp_total["fall"] += 1
                 title="Fall detected"
                 body="Blindstick user has fallen"
                 send_notifications(title, body)
+                save_event("fall_detected", now)
                 save_nofications("hazard", title, body, now)
             elif "emergency" in diff_keys and emergency:
                 temp_total["emergency"] += 1
                 title="Emergency detected"
                 body="Blindstick user has called for an emergeny"
                 send_notifications(title, body)
+                save_event("emergencybutton", now)
                 save_nofications("hazard", title, body, now)
             temp_total["updated_at"] = now
             total_parameter_document.update(temp_total)
