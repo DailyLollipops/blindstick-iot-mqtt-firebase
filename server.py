@@ -120,8 +120,8 @@ def run(**args):
             emergency = bool(float(data[5]))
             power = bool(float(data[6]))
             stop = bool(float(data[7]))
-            distance = bool(float(data[8])) if len(data) >= 9 and data[8] != 'null' else 'null'
-            depth = bool(float(data[9])) if len(data) >= 10 and data[9] != 'null' else 'null'
+            distance = data[8] if len(data) >= 8 else 'null'
+            depth = data[9] if len(data) >= 9 else 'null'
 
             parameters = {
                 "obstacle1": obstacle1,
@@ -133,6 +133,11 @@ def run(**args):
                 "power": power,
                 "stop": stop
             }
+
+            logger.info(f"Distance: {distance}")
+            logger.info(f"Depth: {depth}")
+            if distance != "null" or depth != "null":
+                send_alert(distance, depth)
 
             if current_parameters != parameters:
                 logger.info("Current parameters changed")
@@ -176,9 +181,6 @@ def run(**args):
                 send_notification(title, body)
                 save_event("emergencybutton", now)
                 save_nofications("hazard", title, body, now)
-
-            if distance != "null" or depth != "null":
-                send_alert(distance, depth)
 
             temp_total["updated_at"] = now
             total_parameter_document.update(temp_total)
