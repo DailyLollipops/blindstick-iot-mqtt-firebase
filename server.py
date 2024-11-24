@@ -63,7 +63,7 @@ def run(**args):
         logger.info(f"Connected with result code: {reason_code}")
         client.subscribe(topic)
 
-    def send_notifications(title, body):
+    def send_notification(title, body):
         message = messaging.Message(
             notification=messaging.Notification(
                 title=title,
@@ -73,6 +73,17 @@ def run(**args):
         )
         response = messaging.send(message)
         logger.info(f"Successfully sent notification: {response}")
+
+    def send_alert(distance, depth):
+        message = messaging.Message(
+            data={
+                "distance": str(distance),
+                "depth": str(depth),
+            },
+            topic="alerts"
+        )
+        response = messaging.send(message)
+        logger.info(f"Successfully sent alert: {response}")
 
     def save_event(_type, timestamp):
         data = event_reference.add({
@@ -109,6 +120,9 @@ def run(**args):
             emergency = bool(float(data[5]))
             power = bool(float(data[6]))
             stop = bool(float(data[7]))
+            distance = bool(float(data[8])) if len(data) >= 9 and data[8] != 'null' else 'null'
+            depth = bool(float(data[9])) if len(data) >= 10 and data[9] != 'null' else 'null'
+
             parameters = {
                 "obstacle1": obstacle1,
                 "obstacle2": obstacle2,
@@ -138,30 +152,34 @@ def run(**args):
                 temp_total["obstacle"] += 1
                 title="Obstacle detected"
                 body="An obstacle was detected nearby the blindstick user"
-                send_notifications(title, body)
+                send_notification(title, body)
                 save_event("obstacle_detected", now)
                 save_nofications("hazard", title, body, now)
             elif "water" in diff_keys and water:
                 temp_total["water"] += 1
                 title="Water detected"
                 body="Water was detected nearby the blindstick user"
-                send_notifications(title, body)
+                send_notification(title, body)
                 save_event("water_detected", now)
                 save_nofications("hazard", title, body, now)
             elif "fall" in diff_keys and fall:
                 temp_total["fall"] += 1
                 title="Fall detected"
                 body="Blindstick user has fallen"
-                send_notifications(title, body)
+                send_notification(title, body)
                 save_event("fall_detected", now)
                 save_nofications("hazard", title, body, now)
             elif "emergency" in diff_keys and emergency:
                 temp_total["emergency"] += 1
                 title="Emergency detected"
                 body="Blindstick user has called for an emergeny"
-                send_notifications(title, body)
+                send_notification(title, body)
                 save_event("emergencybutton", now)
                 save_nofications("hazard", title, body, now)
+
+            if distance != "null" or depth != "null":
+                send_alert(distance, depth)
+
             temp_total["updated_at"] = now
             total_parameter_document.update(temp_total)
             logger.info(f"Total parameters: {temp_total}")
