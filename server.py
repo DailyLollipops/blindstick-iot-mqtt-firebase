@@ -109,34 +109,35 @@ def run(**args):
         current_parameters = current_parameter_document.get().to_dict()
         current_parameters.pop("updated_at", "")
         total_parameters = total_parameter_document.get().to_dict()
+        temp_total = total_parameters.copy()
 
         try:
+            if "emergency" in payload:
+                temp_total["emergency"] += 1
+                title="Emergency detected"
+                body="Blindstick user has called for an emergeny"
+                send_notification(title, body)
+                save_event("emergencybutton", now)
+                save_nofications("hazard", title, body, now)
+                return
+            
             data = payload.split()
-            obstacle1= bool(float(data[0]))
-            obstacle2= bool(float(data[1]))
-            obstacle3= bool(float(data[2]))
-            water = bool(float(data[3]))
-            fall = bool(float(data[4]))
-            emergency = bool(float(data[5]))
-            power = bool(float(data[6]))
-            stop = bool(float(data[7]))
-            distance = data[8] if len(data) >= 8 else 'null'
-            depth = data[9] if len(data) >= 9 else 'null'
+            obstacle = bool(float(data[0]))
+            water = bool(float(data[1]))
+            fall = bool(float(data[2]))
+            distance = data[3] if len(data) > 3 else 'null'
+            depth = data[4] if len(data) > 4 else 'null'
 
             parameters = {
-                "obstacle1": obstacle1,
-                "obstacle2": obstacle2,
-                "obstacle3": obstacle3,
+                "obstacle": obstacle,
                 "water": water,
-                "fall": fall,
-                "emergency": emergency,
-                "power": power,
-                "stop": stop
+                "fall": fall
             }
 
             logger.info(f"Distance: {distance}")
             logger.info(f"Depth: {depth}")
             if distance != "null" or depth != "null":
+                logger.info('Sending distance/depth alert')
                 send_alert(distance, depth)
 
             if current_parameters != parameters:
@@ -149,11 +150,10 @@ def run(**args):
                 logger.info("Current parameters did not changed")
                 return
 
-            temp_total = total_parameters.copy()
             diff_keys = [k for k in current_parameters if current_parameters[k] != parameters[k]]
             logger.info(f"Diff: {diff_keys}")
-            obstacles = ["obstacle1", "obstacle2", "obstacle3"]
-            if any(obstacle in diff_keys for obstacle in obstacles) and any([parameters[key] for key in diff_keys]):
+
+            if "obstacle" in diff_keys and obstacle:
                 temp_total["obstacle"] += 1
                 title="Obstacle detected"
                 body="An obstacle was detected nearby the blindstick user"
@@ -173,13 +173,6 @@ def run(**args):
                 body="Blindstick user has fallen"
                 send_notification(title, body)
                 save_event("fall_detected", now)
-                save_nofications("hazard", title, body, now)
-            elif "emergency" in diff_keys and emergency:
-                temp_total["emergency"] += 1
-                title="Emergency detected"
-                body="Blindstick user has called for an emergeny"
-                send_notification(title, body)
-                save_event("emergencybutton", now)
                 save_nofications("hazard", title, body, now)
 
             temp_total["updated_at"] = now
